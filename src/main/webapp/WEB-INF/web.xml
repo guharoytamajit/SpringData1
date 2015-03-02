@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="http://java.sun.com/xml/ns/javaee" xmlns:web="http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+	xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+	id="WebApp_ID" version="2.5">
+	<display-name>spring_test</display-name>
+	<welcome-file-list>
+		<welcome-file>index.jsp</welcome-file>
+	</welcome-file-list>
+
+	<servlet>
+		<servlet-name>spring2</servlet-name>
+		<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+		<!-- if contextConfigLocation was not defined by default spring would have 
+			used /WEB-INF/spring2-servlet.xml -->
+		<!-- here we can also use wildcard to represent multiple files like classpath:*-context.xml -->
+		<!-- If spring cannot find a configuration file for DispatcherServlet it 
+			will throw FileNotFoundException -->
+		<init-param>
+			<param-name>contextConfigLocation</param-name>
+			<param-value>
+			classpath:spring-servlet3.xml
+			</param-value>
+		</init-param>
+		<init-param>
+			<!-- we could have ignore this init param because default value of contextClass 
+				is XmlWebApplicationContext -->
+			<!-- XmlWebApplicationContext specifies we are using xml based configuration -->
+			<param-name>contextClass</param-name>
+			<param-value>org.springframework.web.context.support.XmlWebApplicationContext</param-value>
+		</init-param>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>spring2</servlet-name>
+		<url-pattern>*.htm</url-pattern>
+	</servlet-mapping>
+
+	<listener>
+		<!-- This lister is responsible for loading root application context -->
+		<!-- Root application context is available in all dispatcher servlets -->
+		<!-- ContextLoaderListener is not mandatory, but if declared then we have 
+			to create a new root application context file as well. otherwise we will 
+			get FileNotFoundException. -->
+		<!-- By default it will look for /WEB-INF/applicationContext.xml if context-param's 
+			contextConfigLocation is not specified -->
+		<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+	</listener>
+
+	<context-param>
+		<!-- this represents root applicationcontext is present in com.config package -->
+		<!-- here com.config is the package where spring will search for @Configuration 
+			files -->
+		<!-- for xml based configuration the default value is /WEB-INF/applicationContext.xml -->
+		<!-- for java config style configuration the value of contextConfigLocation must 
+			be explicitly set -->
+		<param-name>contextConfigLocation</param-name>
+		<param-value>/WEB-INF/spring-servlet.xml</param-value>
+	</context-param>
+
+</web-app>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xsi:schemaLocation="
+http://www.springframework.org/schema/beans
+http://www.springframework.org/schema/beans/spring-beans.xsd
+http://www.springframework.org/schema/context
+http://www.springframework.org/schema/context/spring-context.xsd
+                           http://www.springframework.org/schema/tx
+                           http://www.springframework.org/schema/tx/spring-tx.xsd
+                                   http://www.springframework.org/schema/mvc
+        http://www.springframework.org/schema/mvc/spring-mvc-3.0.xsd
+        http://www.springframework.org/schema/jdbc
+                           http://www.springframework.org/schema/jdbc/spring-jdbc.xsd">
+
+
+
+
+
+	<tx:annotation-driven />
+	<bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+		<property name="entityManagerFactory" ref="entityManagerFactory"></property>
+	</bean>
+
+	<bean id="entityManagerFactory"
+		class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+		<property name="dataSource" ref="dataSource"></property>
+		<property name="jpaVendorAdapter">
+			<bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter">
+				<property name="showSql" value="true"></property>
+				<property name="databasePlatform" value="org.hibernate.dialect.HSQLDialect"></property>
+			</bean>
+		</property>
+		<!-- to scan entity classes use persistenceUnitName or packagesToScan -->
+		<!-- <property name="persistenceUnitName" value="employeeManager"></property> -->
+		<property name="packagesToScan" value="com.entity"></property>
+		<!-- <property name="jpaProperties"> <props> <prop key="hibernate.hbm2ddl.auto">create</prop> 
+			</props> </property> -->
+		<!-- hibernate.hbm2ddl.auto re-creates database -->
+
+	</bean>
+
+
+	<!-- <bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource"> 
+		<property name="driverClassName" value="com.mysql.jdbc.Driver"></property> 
+		<property name="username" value="root"></property> <property name="password" 
+		value="admin"></property> <property name="url" value="jdbc:mysql://localhost:3306/test2"></property> 
+		</bean> -->
+
+
+	<!-- default datasource is HSQL -->
+	<jdbc:embedded-database id="dataSource" type="HSQL">
+		<!-- creates employee table -->
+		<jdbc:script location="classpath:schema.sql" />
+	</jdbc:embedded-database>
+
+</beans>
