@@ -264,3 +264,140 @@ Understanding how it works internally is helpful when troubleshooting situations
 The most important thing to bear in mind is that there are really two concepts to take into account: the database transaction and the persistence context, each with it's own not readily apparent life cycle.
 
 
+=========================================================================================
+
+Hibernate Debugging - Finding the origin of a Query
+
+It's not always immediate why and in which part of the program is Hibernate generating a given SQL query, especially if we are dealing with code that we did not write ourselves.
+
+This post will go over how to configure Hibernate query logging, and use that together with other tricks to find out why and where in the program a given query is being executed.
+What does the Hibernate query log look like
+
+Hibernate has built-in query logging that looks like this:
+
+select /* load your.package.Employee */ this_.code, ... 
+from employee this_ 
+where this_.employee_id=?
+
+TRACE 12-04-2014@16:06:02  BasicBinder - binding parameter [1] as [NUMBER] - 1000
+
+Why can't Hibernate log the actual query ?
+
+Notice that what is logged by Hibernate is the prepared statement sent by Hibernate to the JDBC driver plus it's parameters. The prepared statement has ? in the place of the query parameters, the parameter values themselves are logged just bellow the prepared statement.
+
+This is not the same as the actual query sent to the database, as there is no way for Hibernate to log the actual query. The reason for this is that Hibernate only knows about the prepared statements and the parameters that it sends to the JDBC driver, and it's the driver that will build the actual queries and then send them to the database.
+
+In order to produce a log with the real queries, a tool like log4jdbc is needed, which will be the subject of another post.
+How to find out the origin of the query
+
+The logged query above contains a comment that allows to identify in most cases the origin of the query: if the query is due to a load by ID the comment is /* load your.entity.Name */, if it's a named query then the comment will contain the name of the query.
+
+If it's a one to many lazy initialization the comment will contain the name of the class and the property that triggered it, etc.
+Setting up the Hibernate query log
+
+In order to obtain a query log, the following flags need to be set in the configuration of the session factory:
+
+<bean id= "entityManagerFactory" class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean" >
+  ...
+  <property name="jpaProperties" >
+  <props>
+      <prop key="hibernate.show_sql" >true</ prop>
+      <prop key="hibernate.format_sql" >true</ prop>
+      <prop key="hibernate.use_sql_comments">true</prop>
+  </props>
+</property>
+
+The example above is for Spring configuration of an entity manager factory. This is the meaning of the flags:
+
+    show_sql enables query logging
+    format_sql pretty prints the SQL
+    use_sql_comments adds an explanatory comment
+
+In order to log the query parameters, the following log4j or equivalent information is needed:
+
+<logger name="org.hibernate.type">
+    <level value="trace" />
+</logger > 
+
+If everything else fails
+
+In many cases the comment created by use_sql_comments is enough to identify the origin of the query. If this is not sufficient, then we can start by identifying the entity returned by the query based on the table names involved, and put a breakpoint in the constructor of the returned entity.
+
+If the entity does not have a constructor, then we can create one and put the breakpoint in the call to super():
+
+@Entity
+public class Employee {
+    public Employee() {
+        super(); // put the breakpoint here
+    }
+    ...
+}
+
+When the breakpoint is hit, go to the IDE debug view containing the stack call of the program and go through it from top to bottom. The place where the query was made in the program will be there in the call stack.
+
+
+=========================================================================================
+
+Open Session In View Design Tradeoffs
+The Open Session in View (OSIV) pattern gives rise to different opinions in the Java development community. Let's go over OSIV and some of the pros and cons of this pattern.
+
+The problem
+
+The problem that OSIV solves is a mismatch between the Hibernate concept of session and it's lifecycle and the way that many server-side view technologies work.
+
+In a typical Java frontend application the service layer starts by querying some of the data needed to build the view. The remaining data needed can be lazy-loaded later, with the condition that the Hibernate session remains open - and there lies the problem.
+
+Between the moment that the service layer method finishes it's execution and the moment that the view is rendered, Hibernate has already committed the transaction and closed the session.
+
+When the view tries to lazy load the extra data that it needs, if finds the Hibernate session closed, causing a LazyInitializationException.
+
+The OSIV solution
+
+OSIV tackles this problem by ensuring that the Hibernate session is kept open all the way up to the rendering of the view - hence the name of the pattern.
+
+Because the session is kept open, no more LazyInitializationExceptions occur. The session or entity manager is kept open by means of a filter that is added to the request processing chain.
+
+In the case of JPA the OpenEntityManagerInViewFilter will create an entity manager at the beginning of the request, and then bind it to the request thread.
+
+The service layer will then be executed and the business transaction committed or rolled back, but the transaction manager will not remove the entity manager from the thread after the commit.
+
+When the view rendering starts, the transaction manager will then check if there is already an entity manager binded to the thread, and if so use it instead of creating a new one.
+
+After the request is processed, the filter will then unbind the entity manager from the thread.
+
+The end result is that the same entity manager used to commit the business transaction was kept around in the request thread, allowing the view rendering code to lazy load the needed data.
+
+Going back to the original problem
+
+Let's step back a moment and go back to the initial problem: the LazyInitializationException. Is this exception really a problem? This exception can also be seen as a warning sign of a wrongly written query in the service layer.
+
+When building a view and it's backing services, the developer knows upfront what data is needed, and can make sure that the needed data is loaded before the rendering starts.
+
+Several relation types such as one-to-many use lazy-loading by default, but that default setting can be overridden if needed at query time using the following syntax:
+
+select p FROM Person p left join fetch p.invoices
+This means that the lazy loading can be turned off on a case by case basis depending on the data needed by the view.
+
+OSIV in projects I've worked
+
+In projects I have worked that used OSIV, we could see via query logging that the database was getting hit with a high number of SQL queries, sometimes to the point that developers had to turn off the Hibernate SQL logging.
+
+The performance of these application was impacted, but it was kept manageable using second-level caches, and due to the fact that these where intranet-based applications with a limited number of users.
+
+Pros of OSIV
+
+The main advantage of OSIV is that it makes working with ORM and the database more transparent:
+
+Less queries need to be manually written
+Less awareness is required about the Hibernate session and how to solve LazyInitializationExceptions.
+Cons of OSIV
+
+OSIV seems to be easy to misuse and can accidentally introduce N+1 performance problems in the application. On projects I've worked OSIV did not work out well in the long-term.
+
+The alternative of writing custom queries that eager fetch data depending on the use case is manageable and turned out well in other projects I've worked.
+
+Alternatives to OSIV
+
+Besides the application-level solution of writing custom queries to pre-fetch the needed data, there are other framework-level aproaches to OSIV.
+
+The Seam Framework was built by some of the same developers as Hibernate , and solves the problem by introducing the notion of conversation.
