@@ -19,11 +19,14 @@ http://www.springframework.org/schema/context/spring-context.xsd
 
 
 
-	<tx:annotation-driven transaction-manager="transactionManager2"/>
-	<!-- In <tx:annotation-driven> the default value of transaction-manager 
-		is "transactionManager" so if your transaction manager's name is "transactionManager" 
-		then you need not specify transaction-manager attribute in tx:annotation-driven -->
-	
+	<tx:annotation-driven transaction-manager="transactionManager2" />
+	<!-- In <tx:annotation-driven> if the value of transaction-manager is not 
+		provided then @Transactional will search for transaction manager with name 
+		"transactionManager" . Since transaction-manager is provided, now @Transactional 
+		will look for "transactionManager2" as transaction manager . Or alternatively 
+		you can skip transaction-manager attribute and still use "transactionManager2" 
+		by passing it to @Transactional as @Transactional("transactionManager2") -->
+
 	<bean id="transactionManager2" class="org.springframework.orm.jpa.JpaTransactionManager">
 		<property name="entityManagerFactory" ref="entityManagerFactory"></property>
 	</bean>
